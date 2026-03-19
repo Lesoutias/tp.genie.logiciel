@@ -1,100 +1,234 @@
 package com.groupe2.project;
 
+import java.sql.CallableStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.layout.*;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-import java.util.List;
-
+/**
+ * Interface utilisateur pour la gestion des personnes, téléphones, adresses
+ * et leurs relations.
+ * 
+ * @author Groupe2
+ * @version 1.0
+ */
 public class GestionPersonneUI extends Application {
 
-    private BorderPane root;
+    // ============================================================
+    // CONSTANTES
+    // ============================================================
+    private static final int WINDOW_WIDTH = 1100;
+    private static final int WINDOW_HEIGHT = 650;
+    private static final int SPACING_SMALL = 10;
+    private static final int PADDING_STANDARD = 15;
 
-    // PERSONNE UI
+    // ============================================================
+    // COMPOSANTS PRINCIPAUX
+    // ============================================================
+    private BorderPane root;
+    
+    // ============================================================
+    // COMPOSANTS PERSONNE
+    // ============================================================
     private TableView<Personne> tablePersonne;
     private TableView<Telephone> tableTelephonesPersonne;
-
     private TextField txtId;
     private TextField txtNom;
     private TextField txtPostNom;
     private TextField txtPrenom;
     private ComboBox<Sexe> cbSex;
 
-    // TELEPHONE UI
+    // ============================================================
+    // COMPOSANTS TELEPHONE
+    // ============================================================
     private TableView<Telephone> tableTelephone;
     private TextField txtTelId;
     private TextField txtTelType;
     private TextField txtTelNumero;
     private TextField txtTelPersonneId;
+    private ComboBox<Personne> cbTelPersonne;
 
+    // ============================================================
+    // COMPOSANTS ADRESSE
+    // ============================================================
+    private TableView<Adresse> tableAdresse;
+    private TextField txtAdrQuartier;
+    private TextField txtAdrCommune;
+    private TextField txtAdrVille;
+    private TextField txtAdrPays;
+    private TextField txtAdrId;
+
+    // ============================================================
+    // COMPOSANTS PERSONNE-ADRESSE
+    // ============================================================
+    private TableView<PersonneAdresse> tablePersonneAdresse;
+    private TextField txtPAId;
+    private TextField txtPAIdPersonne;
+    private TextField txtPAIdAdresse;
+    private TextField txtPAAvenue;
+    private TextField txtPANumero;
+    private ComboBox<Adresse> cbAdressePersonne;
+
+    // ============================================================
+    // COMPOSANTS RAPPORT
+    // ============================================================
+    private TableView<RapportPersonne> tableRapport;
+
+    // ============================================================
+    // METHODES PRINCIPALES
+    // ============================================================
+    
     @Override
     public void start(Stage stage) {
-
-        // ---------- INITIALIZE DATABASE CONNECTION ----------
-        Connexion config = new Connexion("localhost", "gestion_personne", "root", "Lesoutils@1907", 3306);
-        IConnexion factory = new ImplementeConnexion();
-        DatabaseConnection.getInstance(config, ConnectionType.MYSQL, factory);
-
-        // ---------- ROOT LAYOUT ----------
+        // Initialisation de la connexion à la base de données
+        initializeDatabaseConnection();
+        
+        // Configuration de l'interface principale
         root = new BorderPane();
         root.setTop(buildMenuBar());
         root.setCenter(buildPersonneUI());
 
-        Scene scene = new Scene(root, 1100, 650);
+        // Configuration de la scène et affichage
+        Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
         stage.setTitle("Gestion des Entités");
         stage.setScene(scene);
         stage.show();
     }
 
-    // ---------------------------------------------------------
-    // MENU BAR
-    // ---------------------------------------------------------
+    /**
+     * Initialise la connexion à la base de données MySQL.
+     */
+    private void initializeDatabaseConnection() {
+        Connexion config = new Connexion("localhost", "gestion_personne", "root", "Lesoutils@1907", 3306);
+        IConnexion factory = new ImplementeConnexion();
+        DatabaseConnection.getInstance(config, ConnectionType.MYSQL, factory);
+    }
+
+    // ============================================================
+    // CONSTRUCTION DE LA BARRE DE MENU
+    // ============================================================
+    
+    /**
+     * Construit la barre de menu de navigation.
+     * 
+     * @return MenuBar configurée
+     */
     private MenuBar buildMenuBar() {
         Menu menu = new Menu("Navigation");
 
-        MenuItem personneItem = new MenuItem("Personnes");
-        MenuItem telephoneItem = new MenuItem("Téléphones");
-        MenuItem adresseItem = new MenuItem("Adresses");
-        MenuItem personneAdresseItem = new MenuItem("Personne Adresse");
+        // Création des éléments de menu
+        MenuItem personneItem = createMenuItem("Personnes", e -> root.setCenter(buildPersonneUI()));
+        MenuItem telephoneItem = createMenuItem("Téléphones", e -> root.setCenter(buildTelephoneUI()));
+        MenuItem adresseItem = createMenuItem("Adresses", e -> root.setCenter(buildAdresseUI()));
+        MenuItem personneAdresseItem = createMenuItem("Personne Adresse", e -> root.setCenter(buildPersonneAdresseUI()));
+        MenuItem rapportItem = createMenuItem("Rapport", e -> root.setCenter(buildRapportUI()));
 
-        personneItem.setOnAction(e -> root.setCenter(buildPersonneUI()));
-        telephoneItem.setOnAction(e -> root.setCenter(buildTelephoneUI()));
-        adresseItem.setOnAction(e -> root.setCenter(buildAdresseUI()));
-        personneAdresseItem.setOnAction(e -> root.setCenter(buildPersonneAdresseUI()));
-
-
-        menu.getItems().addAll(personneItem, telephoneItem, adresseItem, personneAdresseItem);
-
+        menu.getItems().addAll(personneItem, telephoneItem, adresseItem, personneAdresseItem, rapportItem);
         return new MenuBar(menu);
     }
 
-    // ---------------------------------------------------------
-    // PERSONNE UI
-    // ---------------------------------------------------------
-    private VBox buildPersonneUI() {
+    /**
+     * Crée un élément de menu avec son gestionnaire d'événement.
+     * 
+     * @param title Titre du menu
+     * @param handler Gestionnaire d'événement
+     * @return MenuItem configuré
+     */
+    private MenuItem createMenuItem(String title, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
+        MenuItem item = new MenuItem(title);
+        item.setOnAction(handler);
+        return item;
+    }
 
+    // ============================================================
+    // INTERFACE PERSONNE
+    // ============================================================
+    
+    /**
+     * Construit l'interface de gestion des personnes.
+     * 
+     * @return VBox contenant l'interface personne
+     */
+    private VBox buildPersonneUI() {
+        // Initialisation des champs de saisie
+        initializePersonneFields();
+        
+        // Construction du formulaire
+        HBox form = createPersonneForm();
+        
+        // Construction des boutons
+        HBox buttons = createPersonneButtons();
+        
+        // Construction des tableaux
+        initializePersonneTable();
+        initializeTelephonesPersonneTable();
+        
+        // Chargement des données
+        loadPersonnes();
+
+        // Assemblage final
+        return createPersonneLayout(form, buttons);
+    }
+
+    /**
+     * Initialise les champs de saisie pour une personne.
+     */
+    private void initializePersonneFields() {
         txtId = new TextField();
-        txtNom = new TextField();
-        txtPostNom = new TextField();
-        txtPrenom = new TextField();
+        txtNom = createTextField("Nom");
+        txtPostNom = createTextField("Postnom");
+        txtPrenom = createTextField("Prénom");
+        
         cbSex = new ComboBox<>();
         cbSex.getItems().addAll(Sexe.MASCULIN, Sexe.FEMININ);
-
-        txtId.setPromptText("ID");
-        txtNom.setPromptText("Nom");
-        txtPostNom.setPromptText("Postnom");
-        txtPrenom.setPromptText("Prénom");
         cbSex.setPromptText("Sexe");
+    }
 
-        HBox form = new HBox(10, txtNom, txtPostNom, txtPrenom, cbSex);
-        form.setPadding(new Insets(10));
+    /**
+     * Crée un champ de texte avec un prompt.
+     */
+    private TextField createTextField(String prompt) {
+        TextField field = new TextField();
+        field.setPromptText(prompt);
+        return field;
+    }
+
+    /**
+     * Crée le formulaire de saisie pour une personne.
+     */
+    private HBox createPersonneForm() {
+        HBox form = new HBox(SPACING_SMALL, txtNom, txtPostNom, txtPrenom, cbSex);
+        form.setPadding(new Insets(PADDING_STANDARD));
         form.setAlignment(Pos.CENTER);
+        return form;
+    }
 
+    /**
+     * Crée les boutons d'action pour la gestion des personnes.
+     */
+    private HBox createPersonneButtons() {
         Button btnSave = new Button("Enregistrer");
         Button btnDelete = new Button("Supprimer");
         Button btnRefresh = new Button("Actualiser");
@@ -103,51 +237,61 @@ public class GestionPersonneUI extends Application {
         btnDelete.setOnAction(e -> deletePersonne());
         btnRefresh.setOnAction(e -> loadPersonnes());
 
-        HBox buttons = new HBox(10, btnSave, btnDelete, btnRefresh);
+        HBox buttons = new HBox(SPACING_SMALL, btnSave, btnDelete, btnRefresh);
         buttons.setAlignment(Pos.CENTER);
-        buttons.setPadding(new Insets(10));
+        buttons.setPadding(new Insets(PADDING_STANDARD));
+        return buttons;
+    }
 
+    /**
+     * Initialise le tableau des personnes.
+     */
+    private void initializePersonneTable() {
         tablePersonne = new TableView<>();
 
-        TableColumn<Personne, Integer> colId = new TableColumn<>("ID");
-        colId.setCellValueFactory(new PropertyValueFactory<>("id"));
-
-        TableColumn<Personne, String> colNom = new TableColumn<>("Nom");
-        colNom.setCellValueFactory(new PropertyValueFactory<>("nom"));
-
-        TableColumn<Personne, String> colPostNom = new TableColumn<>("Postnom");
-        colPostNom.setCellValueFactory(new PropertyValueFactory<>("postNom"));
-
-        TableColumn<Personne, String> colPrenom = new TableColumn<>("Prenom");
-        colPrenom.setCellValueFactory(new PropertyValueFactory<>("prenom"));
-
-        TableColumn<Personne, Sexe> colSex = new TableColumn<>("Sexe");
-        colSex.setCellValueFactory(new PropertyValueFactory<>("sex"));
+        TableColumn<Personne, Integer> colId = createTableColumn("ID", "id", Integer.class);
+        TableColumn<Personne, String> colNom = createTableColumn("Nom", "nom", String.class);
+        TableColumn<Personne, String> colPostNom = createTableColumn("Postnom", "postNom", String.class);
+        TableColumn<Personne, String> colPrenom = createTableColumn("Prenom", "prenom", String.class);
+        TableColumn<Personne, Sexe> colSex = createTableColumn("Sexe", "sex", Sexe.class);
 
         tablePersonne.getColumns().addAll(colId, colNom, colPostNom, colPrenom, colSex);
 
-        // TABLE DES TELEPHONES DE LA PERSONNE
-        tableTelephonesPersonne = new TableView<>();
-
-        TableColumn<Telephone, String> colNum = new TableColumn<>("Numéro");
-        colNum.setCellValueFactory(new PropertyValueFactory<>("numero"));
-
-        TableColumn<Telephone, String> colType = new TableColumn<>("Type");
-        colType.setCellValueFactory(new PropertyValueFactory<>("initial"));
-
-        tableTelephonesPersonne.getColumns().addAll(colNum, colType);
-
-        // Listener : quand on clique une personne → charger ses téléphones
+        // Listener pour charger les téléphones de la personne sélectionnée
         tablePersonne.setOnMouseClicked(e -> {
             Personne selected = tablePersonne.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 loadTelephonesForPersonne(selected.getId());
             }
         });
+    }
 
-        loadPersonnes();
+    /**
+     * Initialise le tableau des téléphones d'une personne.
+     */
+    private void initializeTelephonesPersonneTable() {
+        tableTelephonesPersonne = new TableView<>();
 
-        VBox layout = new VBox(10,
+        TableColumn<Telephone, String> colNum = createTableColumn("Numéro", "numero", String.class);
+        TableColumn<Telephone, String> colType = createTableColumn("Type", "initial", String.class);
+
+        tableTelephonesPersonne.getColumns().addAll(colNum, colType);
+    }
+
+    /**
+     * Crée une colonne de tableau typée.
+     */
+    private <S, T> TableColumn<S, T> createTableColumn(String title, String property, Class<T> type) {
+        TableColumn<S, T> column = new TableColumn<>(title);
+        column.setCellValueFactory(new PropertyValueFactory<>(property));
+        return column;
+    }
+
+    /**
+     * Crée la disposition complète pour l'interface personne.
+     */
+    private VBox createPersonneLayout(HBox form, HBox buttons) {
+        VBox layout = new VBox(SPACING_SMALL,
                 form,
                 buttons,
                 new Label("Liste des personnes"),
@@ -156,35 +300,62 @@ public class GestionPersonneUI extends Application {
                 tableTelephonesPersonne
         );
 
-        layout.setPadding(new Insets(15));
+        layout.setPadding(new Insets(PADDING_STANDARD));
         return layout;
     }
 
-    // ---------------------------------------------------------
-    // TELEPHONE UI
-    // ---------------------------------------------------------
+    // ============================================================
+    // INTERFACE TELEPHONE
+    // ============================================================
     
-    private ComboBox<Personne> cbTelPersonne;
-
+    /**
+     * Construit l'interface de gestion des téléphones.
+     */
     private VBox buildTelephoneUI() {
-
-        txtTelId = new TextField();
-        txtTelType = new TextField();
-        txtTelNumero = new TextField();
-        txtTelPersonneId = new TextField();
+        initializeTelephoneFields();
+        initializePersonneComboBox();
         
+        HBox form = createTelephoneForm();
+        HBox buttons = createTelephoneButtons();
+        
+        initializeTelephoneTable();
+        loadTelephones();
+
+        return createTelephoneLayout(form, buttons);
+    }
+
+    /**
+     * Initialise les champs de saisie pour un téléphone.
+     */
+    private void initializeTelephoneFields() {
+        txtTelId = new TextField();
+        txtTelType = createTextField("Type");
+        txtTelNumero = createTextField("Numéro");
+        txtTelPersonneId = createTextField("ID Personne");
+    }
+
+    /**
+     * Initialise la combobox des personnes.
+     */
+    private void initializePersonneComboBox() {
         cbTelPersonne = new ComboBox<>();
         cbTelPersonne.setPromptText("Sélectionner une personne");
 
-        // Charger les personnes
+        // Chargement des personnes
         Personne p = new Personne();
         List<IPersonne> personnes = p.Personnes();
-
         for (IPersonne pers : personnes) {
             cbTelPersonne.getItems().add((Personne) pers);
         }
 
-        // Affichage lisible
+        // Configuration de l'affichage
+        configurePersonneComboBoxDisplay();
+    }
+
+    /**
+     * Configure l'affichage de la combobox des personnes.
+     */
+    private void configurePersonneComboBoxDisplay() {
         cbTelPersonne.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(Personne item, boolean empty) {
@@ -200,18 +371,22 @@ public class GestionPersonneUI extends Application {
                 setText(empty || item == null ? "" : item.getNom() + " " + item.getPostNom());
             }
         });
+    }
 
-        
-
-        txtTelId.setPromptText("ID");
-        txtTelType.setPromptText("Type");
-        txtTelNumero.setPromptText("Numéro");
-        txtTelPersonneId.setPromptText("ID Personne");
-
-        HBox form = new HBox(10, txtTelType, txtTelNumero, cbTelPersonne);
-        form.setPadding(new Insets(10));
+    /**
+     * Crée le formulaire de saisie pour un téléphone.
+     */
+    private HBox createTelephoneForm() {
+        HBox form = new HBox(SPACING_SMALL, txtTelType, txtTelNumero, cbTelPersonne);
+        form.setPadding(new Insets(PADDING_STANDARD));
         form.setAlignment(Pos.CENTER);
+        return form;
+    }
 
+    /**
+     * Crée les boutons d'action pour la gestion des téléphones.
+     */
+    private HBox createTelephoneButtons() {
         Button btnSave = new Button("Enregistrer");
         Button btnDelete = new Button("Supprimer");
         Button btnRefresh = new Button("Actualiser");
@@ -220,43 +395,280 @@ public class GestionPersonneUI extends Application {
         btnDelete.setOnAction(e -> deleteTelephone());
         btnRefresh.setOnAction(e -> loadTelephones());
 
-        HBox buttons = new HBox(10, btnSave, btnDelete, btnRefresh);
+        HBox buttons = new HBox(SPACING_SMALL, btnSave, btnDelete, btnRefresh);
         buttons.setAlignment(Pos.CENTER);
-        buttons.setPadding(new Insets(10));
+        buttons.setPadding(new Insets(PADDING_STANDARD));
+        return buttons;
+    }
 
+    /**
+     * Initialise le tableau des téléphones.
+     */
+    private void initializeTelephoneTable() {
         tableTelephone = new TableView<>();
 
-        TableColumn<Telephone, Integer> colId = new TableColumn<>("ID");
-        colId.setCellValueFactory(new PropertyValueFactory<>("id"));
-        
-        TableColumn<Telephone, String> colType = new TableColumn<>("Type");
-        colType.setCellValueFactory(new PropertyValueFactory<>("initial"));
-
-        TableColumn<Telephone, String> colNumero = new TableColumn<>("Numéro");
-        colNumero.setCellValueFactory(new PropertyValueFactory<>("numero"));
-
-        TableColumn<Telephone, Integer> colPersonne = new TableColumn<>("Personne ID");
-        colPersonne.setCellValueFactory(new PropertyValueFactory<>("idProprietaire"));
+        TableColumn<Telephone, Integer> colId = createTableColumn("ID", "id", Integer.class);
+        TableColumn<Telephone, String> colType = createTableColumn("Type", "initial", String.class);
+        TableColumn<Telephone, String> colNumero = createTableColumn("Numéro", "numero", String.class);
+        TableColumn<Telephone, Integer> colPersonne = createTableColumn("Personne ID", "idProprietaire", Integer.class);
 
         tableTelephone.getColumns().addAll(colId, colNumero, colType, colPersonne);
+    }
 
-        loadTelephones();
-
-        VBox layout = new VBox(10, form, buttons, tableTelephone);
-        layout.setPadding(new Insets(15));
-
+    /**
+     * Crée la disposition pour l'interface téléphone.
+     */
+    private VBox createTelephoneLayout(HBox form, HBox buttons) {
+        VBox layout = new VBox(SPACING_SMALL, form, buttons, tableTelephone);
+        layout.setPadding(new Insets(PADDING_STANDARD));
         return layout;
     }
 
-    // ---------------------------------------------------------
-    // CRUD PERSONNE
-    // ---------------------------------------------------------
+    // ============================================================
+    // INTERFACE ADRESSE
+    // ============================================================
+    
+    /**
+     * Construit l'interface de gestion des adresses.
+     */
+    private VBox buildAdresseUI() {
+        initializeAdresseFields();
+        
+        HBox form = createAdresseForm();
+        HBox buttons = createAdresseButtons();
+        
+        initializeAdresseTable();
+        loadAdresses();
+
+        return createAdresseLayout(form, buttons);
+    }
+
+    /**
+     * Initialise les champs de saisie pour une adresse.
+     */
+    private void initializeAdresseFields() {
+        txtAdrQuartier = createTextField("Quartier");
+        txtAdrCommune = createTextField("Commune");
+        txtAdrVille = createTextField("Ville");
+        txtAdrPays = createTextField("Pays");
+        txtAdrId = new TextField();
+    }
+
+    /**
+     * Crée le formulaire de saisie pour une adresse.
+     */
+    private HBox createAdresseForm() {
+        HBox form = new HBox(SPACING_SMALL, txtAdrQuartier, txtAdrCommune, txtAdrVille, txtAdrPays);
+        form.setPadding(new Insets(PADDING_STANDARD));
+        form.setAlignment(Pos.CENTER);
+        return form;
+    }
+
+    /**
+     * Crée les boutons d'action pour la gestion des adresses.
+     */
+    private HBox createAdresseButtons() {
+        Button btnSave = new Button("Enregistrer");
+        Button btnDelete = new Button("Supprimer");
+        Button btnRefresh = new Button("Actualiser");
+
+        btnSave.setOnAction(e -> saveAdresse());
+        btnDelete.setOnAction(e -> deleteAdresse());
+        btnRefresh.setOnAction(e -> loadAdresses());
+
+        HBox buttons = new HBox(SPACING_SMALL, btnSave, btnDelete, btnRefresh);
+        buttons.setAlignment(Pos.CENTER);
+        buttons.setPadding(new Insets(PADDING_STANDARD));
+        return buttons;
+    }
+
+    /**
+     * Initialise le tableau des adresses.
+     */
+    private void initializeAdresseTable() {
+        tableAdresse = new TableView<>();
+
+        TableColumn<Adresse, Integer> colId = createTableColumn("ID", "id", Integer.class);
+        TableColumn<Adresse, String> colQuartier = createTableColumn("Quartier", "quartier", String.class);
+        TableColumn<Adresse, String> colCommune = createTableColumn("Commune", "commune", String.class);
+        TableColumn<Adresse, String> colVille = createTableColumn("Ville", "ville", String.class);
+        TableColumn<Adresse, String> colPays = createTableColumn("Pays", "pays", String.class);
+
+        tableAdresse.getColumns().addAll(colId, colQuartier, colCommune, colVille, colPays);
+    }
+
+    /**
+     * Crée la disposition pour l'interface adresse.
+     */
+    private VBox createAdresseLayout(HBox form, HBox buttons) {
+        VBox layout = new VBox(SPACING_SMALL, form, buttons, tableAdresse);
+        layout.setPadding(new Insets(PADDING_STANDARD));
+        return layout;
+    }
+
+    // ============================================================
+    // INTERFACE PERSONNE-ADRESSE (DOMICILE)
+    // ============================================================
+    
+    /**
+     * Construit l'interface de gestion des domiciles (personne-adresse).
+     */
+    private VBox buildPersonneAdresseUI() {
+        initializePersonneAdresseFields();
+        initializeAdresseComboBox();
+        
+        HBox form = createPersonneAdresseForm();
+        HBox buttons = createPersonneAdresseButtons();
+        
+        initializePersonneAdresseTable();
+        loadPersonneAdresse();
+
+        return createPersonneAdresseLayout(form, buttons);
+    }
+
+    /**
+     * Initialise les champs de saisie pour un domicile.
+     */
+    private void initializePersonneAdresseFields() {
+        txtPAId = new TextField();
+        txtPAIdPersonne = createTextField("ID Personne");
+        txtPAIdAdresse = createTextField("ID Adresse");
+        txtPAAvenue = createTextField("Avenue");
+        txtPANumero = createTextField("Numéro");
+        
+        // Réutilisation de la combobox personne
+        initializePersonneComboBox();
+    }
+
+    /**
+     * Initialise la combobox des adresses.
+     */
+    private void initializeAdresseComboBox() {
+        cbAdressePersonne = new ComboBox<>();
+        cbAdressePersonne.setPromptText("Sélectionner l'adresse");
+
+        // Chargement des adresses
+        Adresse a = new Adresse();
+        List<Adresse> adresses = a.Adresses();
+        cbAdressePersonne.getItems().addAll(adresses);
+
+        // Configuration de l'affichage
+        configureAdresseComboBoxDisplay();
+    }
+
+    /**
+     * Configure l'affichage de la combobox des adresses.
+     */
+    private void configureAdresseComboBoxDisplay() {
+        cbAdressePersonne.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(Adresse item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : item.getQuartier() + ", " + item.getVille());
+            }
+        });
+
+        cbAdressePersonne.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(Adresse item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : item.getQuartier() + ", " + item.getVille());
+            }
+        });
+    }
+
+    /**
+     * Crée le formulaire de saisie pour un domicile.
+     */
+    private HBox createPersonneAdresseForm() {
+        HBox form = new HBox(SPACING_SMALL, cbTelPersonne, cbAdressePersonne, txtPAAvenue, txtPANumero);
+        form.setPadding(new Insets(PADDING_STANDARD));
+        form.setAlignment(Pos.CENTER);
+        return form;
+    }
+
+    /**
+     * Crée les boutons d'action pour la gestion des domiciles.
+     */
+    private HBox createPersonneAdresseButtons() {
+        Button btnSave = new Button("Enregistrer");
+        Button btnDelete = new Button("Supprimer");
+
+        btnSave.setOnAction(e -> savePersonneAdresse());
+        btnDelete.setOnAction(e -> deletePersonneAdresse());
+
+        HBox buttons = new HBox(SPACING_SMALL, btnSave, btnDelete);
+        buttons.setAlignment(Pos.CENTER);
+        buttons.setPadding(new Insets(PADDING_STANDARD));
+        return buttons;
+    }
+
+    /**
+     * Initialise le tableau des domiciles.
+     */
+    private void initializePersonneAdresseTable() {
+        tablePersonneAdresse = new TableView<>();
+
+        TableColumn<PersonneAdresse, Integer> colId = createTableColumn("ID", "id", Integer.class);
+        TableColumn<PersonneAdresse, Integer> colPers = createTableColumn("ID Personne", "idPersonne", Integer.class);
+        TableColumn<PersonneAdresse, Integer> colAdr = createTableColumn("ID Adresse", "idAdresse", Integer.class);
+        TableColumn<PersonneAdresse, String> colAvenue = createTableColumn("Avenue", "avenue", String.class);
+        TableColumn<PersonneAdresse, Integer> colNum = createTableColumn("Numéro", "numeroAvenue", Integer.class);
+
+        tablePersonneAdresse.getColumns().addAll(colId, colPers, colAdr, colAvenue, colNum);
+    }
+
+    /**
+     * Crée la disposition pour l'interface domicile.
+     */
+    private VBox createPersonneAdresseLayout(HBox form, HBox buttons) {
+        VBox layout = new VBox(SPACING_SMALL, form, buttons, tablePersonneAdresse);
+        layout.setPadding(new Insets(PADDING_STANDARD));
+        return layout;
+    }
+
+    // ============================================================
+    // INTERFACE RAPPORT
+    // ============================================================
+    
+    /**
+     * Construit l'interface du rapport des personnes.
+     */
+    private VBox buildRapportUI() {
+        initializeRapportTable();
+        
+        VBox layout = new VBox(SPACING_SMALL, new Label("Rapport des personnes"), tableRapport);
+        layout.setPadding(new Insets(PADDING_STANDARD));
+        
+        return layout;
+    }
+
+    /**
+     * Initialise le tableau du rapport.
+     */
+    private void initializeRapportTable() {
+        tableRapport = new TableView<>();
+
+        TableColumn<RapportPersonne, String> colNom = createTableColumn("Personne", "nomComplet", String.class);
+        TableColumn<RapportPersonne, String> colNum = createTableColumn("Numéros", "numeros", String.class);
+        TableColumn<RapportPersonne, String> colAdr = createTableColumn("Adresses", "adresses", String.class);
+
+        tableRapport.getColumns().addAll(colNom, colNum, colAdr);
+        tableRapport.getItems().addAll(loadRapport());
+    }
+
+    // ============================================================
+    // OPERATIONS CRUD - PERSONNE
+    // ============================================================
+    
+    /**
+     * Sauvegarde une nouvelle personne.
+     */
     private void savePersonne() {
         try {
-        	
-        	Personne p = new Personne();
-
-       	 	int newId = p.getLastId() + 1;
+            Personne p = new Personne();
+            int newId = p.getLastId() + 1;
+            
             Personne pers = new Personne(
                     newId,
                     txtNom.getText(),
@@ -267,30 +679,40 @@ public class GestionPersonneUI extends Application {
 
             pers.Enregistrer(pers);
             loadPersonnes();
+            clearPersonneFields();
 
         } catch (Exception ex) {
             showError("Erreur lors de l'enregistrement : " + ex.getMessage());
         }
     }
 
+    /**
+     * Supprime la personne sélectionnée.
+     */
     private void deletePersonne() {
-	    try {
-	        Personne selected = tablePersonne.getSelectionModel().getSelectedItem();
+        try {
+            Personne selected = tablePersonne.getSelectionModel().getSelectedItem();
 
-	        if (selected == null) {
-	            showError("Veuillez sélectionner une adresse dans la liste.");
-	            return;
-	        }
+            if (selected == null) {
+                showError("Veuillez sélectionner une personne dans la liste.");
+                return;
+            }
 
-	        Personne p = new Personne();
-	        p.Supprimer(selected.getId());
-	        loadAdresses();
+            if (confirmDelete("personne")) {
+                Personne p = new Personne();
+                p.Supprimer(selected.getId());
+                loadPersonnes();
+                tableTelephonesPersonne.getItems().clear();
+            }
 
-	    } catch (Exception ex) {
-	        showError("Erreur lors de la suppression : " + ex.getMessage());
-	    }
-	}
+        } catch (Exception ex) {
+            showError("Erreur lors de la suppression : " + ex.getMessage());
+        }
+    }
 
+    /**
+     * Charge la liste des personnes.
+     */
     private void loadPersonnes() {
         try {
             Personne p = new Personne();
@@ -306,6 +728,97 @@ public class GestionPersonneUI extends Application {
         }
     }
 
+    /**
+     * Efface les champs de saisie d'une personne.
+     */
+    private void clearPersonneFields() {
+        txtNom.clear();
+        txtPostNom.clear();
+        txtPrenom.clear();
+        cbSex.setValue(null);
+    }
+
+    // ============================================================
+    // OPERATIONS CRUD - TELEPHONE
+    // ============================================================
+    
+    /**
+     * Sauvegarde un nouveau téléphone.
+     */
+    private void saveTelephone() {
+        try {
+            Personne selectedPerson = cbTelPersonne.getValue();
+
+            if (selectedPerson == null) {
+                showError("Veuillez sélectionner une personne.");
+                return;
+            }
+
+            Telephone t = new Telephone();
+            int newId = t.getLastId() + 1;
+
+            Telephone tel = new Telephone(
+                    newId,
+                    txtTelType.getText(),
+                    txtTelNumero.getText(),
+                    selectedPerson.getId()
+            );
+
+            tel.Enregistrer(tel);
+            loadTelephones();
+            clearTelephoneFields();
+
+        } catch (Exception ex) {
+            showError("Erreur lors de l'enregistrement : " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Supprime le téléphone sélectionné.
+     */
+    private void deleteTelephone() {
+        try {
+            Telephone selected = tableTelephone.getSelectionModel().getSelectedItem();
+
+            if (selected == null) {
+                showError("Veuillez sélectionner un téléphone dans la liste.");
+                return;
+            }
+
+            if (confirmDelete("téléphone")) {
+                Telephone t = new Telephone();
+                t.Supprimer(selected.getId());
+                loadTelephones();
+            }
+
+        } catch (Exception ex) {
+            showError("Erreur lors de la suppression : " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Charge la liste des téléphones.
+     */
+    private void loadTelephones() {
+        try {
+            Telephone t = new Telephone();
+            List<ITelephone> list = t.Telephones();
+
+            tableTelephone.getItems().clear();
+            for (ITelephone tel : list) {
+                tableTelephone.getItems().add((Telephone) tel);
+            }
+
+        } catch (Exception ex) {
+            showError("Erreur lors du chargement : " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Charge les téléphones d'une personne spécifique.
+     * 
+     * @param personneId Identifiant de la personne
+     */
     private void loadTelephonesForPersonne(int personneId) {
         try {
             Telephone t = new Telephone();
@@ -321,396 +834,252 @@ public class GestionPersonneUI extends Application {
         }
     }
 
-    // ---------------------------------------------------------
-    // CRUD TELEPHONE
-    // ---------------------------------------------------------
-    private void saveTelephone() {
+    /**
+     * Efface les champs de saisie d'un téléphone.
+     */
+    private void clearTelephoneFields() {
+        txtTelType.clear();
+        txtTelNumero.clear();
+        cbTelPersonne.setValue(null);
+    }
+
+    // ============================================================
+    // OPERATIONS CRUD - ADRESSE
+    // ============================================================
+    
+    /**
+     * Sauvegarde une nouvelle adresse.
+     */
+    private void saveAdresse() {
         try {
-            // Récupérer la personne sélectionnée dans le ComboBox
+            Adresse a = new Adresse();
+            int newId = a.getLastId() + 1;
+
+            Adresse adr = new Adresse(
+                    newId,
+                    txtAdrQuartier.getText(),
+                    txtAdrCommune.getText(),
+                    txtAdrVille.getText(),
+                    txtAdrPays.getText()
+            );
+
+            adr.Enregistrer(adr);
+            loadAdresses();
+            clearAdresseFields();
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            showError("Erreur lors de l'enregistrement : " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Supprime l'adresse sélectionnée.
+     */
+    private void deleteAdresse() {
+        try {
+            Adresse selected = tableAdresse.getSelectionModel().getSelectedItem();
+
+            if (selected == null) {
+                showError("Veuillez sélectionner une adresse dans la liste.");
+                return;
+            }
+
+            if (confirmDelete("adresse")) {
+                Adresse a = new Adresse();
+                a.Supprimer(selected.getId());
+                loadAdresses();
+            }
+
+        } catch (Exception ex) {
+            showError("Erreur lors de la suppression : " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Charge la liste des adresses.
+     */
+    private void loadAdresses() {
+        try {
+            Adresse a = new Adresse();
+            List<Adresse> list = a.Adresses();
+
+            tableAdresse.getItems().clear();
+            tableAdresse.getItems().addAll(list);
+
+        } catch (Exception ex) {
+            showError("Erreur lors du chargement : " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Efface les champs de saisie d'une adresse.
+     */
+    private void clearAdresseFields() {
+        txtAdrQuartier.clear();
+        txtAdrCommune.clear();
+        txtAdrVille.clear();
+        txtAdrPays.clear();
+    }
+
+    // ============================================================
+    // OPERATIONS CRUD - PERSONNE-ADRESSE
+    // ============================================================
+    
+    /**
+     * Sauvegarde un nouveau domicile (relation personne-adresse).
+     */
+    private void savePersonneAdresse() {
+        try {
             Personne selectedPerson = cbTelPersonne.getValue();
+            Adresse selectedAdresse = cbAdressePersonne.getValue();
 
             if (selectedPerson == null) {
                 showError("Veuillez sélectionner une personne.");
                 return;
             }
 
-            // Générer le nouvel ID
-            Telephone t = new Telephone();
-            int newId = t.getLastId() + 1;
+            if (selectedAdresse == null) {
+                showError("Veuillez sélectionner une adresse.");
+                return;
+            }
 
-            // Créer le téléphone
-            Telephone tel = new Telephone(
+            PersonneAdresse p = new PersonneAdresse();
+            int newId = p.getLastId() + 1;
+            
+            PersonneAdresse pa = new PersonneAdresse(
                     newId,
-                    txtTelType.getText(),      // initial
-                    txtTelNumero.getText(),    // numero
-                    selectedPerson.getId()     // idProprietaire
+                    selectedPerson.getId(),
+                    selectedAdresse.getId(),
+                    txtPAAvenue.getText(),
+                    Integer.parseInt(txtPANumero.getText())
             );
 
-            tel.Enregistrer(tel);
-            loadTelephones();
+            pa.Enregistrer(pa);
+            loadPersonneAdresse();
+            clearPersonneAdresseFields();
 
+        } catch (NumberFormatException ex) {
+            showError("Le numéro doit être un nombre valide.");
         } catch (Exception ex) {
-            showError("Erreur lors de l'enregistrement : " + ex.getMessage());
+            ex.printStackTrace();
+            showError("Erreur lors de l'enregistrement du domicile : " + ex.getMessage());
         }
     }
 
+    /**
+     * Supprime le domicile sélectionné.
+     */
+    private void deletePersonneAdresse() {
+        try {
+            PersonneAdresse selected = tablePersonneAdresse.getSelectionModel().getSelectedItem();
 
-    private void deleteTelephone() {
-    	try {
-	        Telephone selected = tableTelephone.getSelectionModel().getSelectedItem();
+            if (selected == null) {
+                showError("Veuillez sélectionner un domicile dans la liste.");
+                return;
+            }
 
-	        if (selected == null) {
-	            showError("Veuillez sélectionner une adresse dans la liste.");
-	            return;
-	        }
+            if (confirmDelete("domicile")) {
+                PersonneAdresse a = new PersonneAdresse();
+                a.Supprimer(selected.getId());
+                loadPersonneAdresse();
+            }
 
-	        Telephone t = new Telephone();
-	        t.Supprimer(selected.getId());
-	        loadAdresses();
-
-	    } catch (Exception ex) {
-	        showError("Erreur lors de la suppression : " + ex.getMessage());
-	    }
+        } catch (Exception ex) {
+            showError("Erreur lors de la suppression : " + ex.getMessage());
+        }
     }
 
-    private void loadTelephones() {
+    /**
+     * Charge la liste des domiciles.
+     */
+    private void loadPersonneAdresse() {
         try {
-            Telephone t = new Telephone();
-            List<ITelephone> list = t.Telephones();
+            PersonneAdresse pa = new PersonneAdresse();
+            List<PersonneAdresse> list = pa.PersonnesAdresse();
 
-            tableTelephone.getItems().clear();
-            for (ITelephone tel : list) {
-                tableTelephone.getItems().add((Telephone) tel);
-            }
+            tablePersonneAdresse.getItems().clear();
+            tablePersonneAdresse.getItems().addAll(list);
 
         } catch (Exception ex) {
             showError("Erreur lors du chargement : " + ex.getMessage());
         }
     }
+
+    /**
+     * Efface les champs de saisie d'un domicile.
+     */
+    private void clearPersonneAdresseFields() {
+        cbTelPersonne.setValue(null);
+        cbAdressePersonne.setValue(null);
+        txtPAAvenue.clear();
+        txtPANumero.clear();
+    }
+
+    // ============================================================
+    // OPERATIONS RAPPORT
+    // ============================================================
     
- // ---------------------------------------------------------
- // ADRESSE UI
- // ---------------------------------------------------------
- private TableView<Adresse> tableAdresse;
- private TextField txtAdrQuartier;
- private TextField txtAdrCommune;
- private TextField txtAdrVille;
- private TextField txtAdrPays;
- private TextField txtAdrId;
-
- private VBox buildAdresseUI() {
-
-     txtAdrQuartier = new TextField();
-     txtAdrCommune = new TextField();
-     txtAdrVille = new TextField();
-     txtAdrPays = new TextField();
-     txtAdrId = new TextField();
-
-     txtAdrQuartier.setPromptText("Quartier");
-     txtAdrCommune.setPromptText("Commune");
-     txtAdrVille.setPromptText("Ville");
-     txtAdrPays.setPromptText("Pays");
-
-     HBox form = new HBox(10, txtAdrQuartier, txtAdrCommune, txtAdrVille, txtAdrPays);
-     form.setPadding(new Insets(10));
-     form.setAlignment(Pos.CENTER);
-
-     Button btnSave = new Button("Enregistrer");
-     Button btnDelete = new Button("Supprimer");
-     Button btnRefresh = new Button("Actualiser");
-
-     btnSave.setOnAction(e -> saveAdresse());
-     btnDelete.setOnAction(e -> deleteAdresse());
-     btnRefresh.setOnAction(e -> loadAdresses());
-
-     HBox buttons = new HBox(10, btnSave, btnDelete, btnRefresh);
-     buttons.setAlignment(Pos.CENTER);
-     buttons.setPadding(new Insets(10));
-
-     tableAdresse = new TableView<>();
-
-     TableColumn<Adresse, Integer> colId = new TableColumn<>("ID");
-     colId.setCellValueFactory(new PropertyValueFactory<>("id"));
-
-     TableColumn<Adresse, String> colQuartier = new TableColumn<>("Quartier");
-     colQuartier.setCellValueFactory(new PropertyValueFactory<>("quartier"));
-
-     TableColumn<Adresse, String> colCommune = new TableColumn<>("Commune");
-     colCommune.setCellValueFactory(new PropertyValueFactory<>("commune"));
-
-     TableColumn<Adresse, String> colVille = new TableColumn<>("Ville");
-     colVille.setCellValueFactory(new PropertyValueFactory<>("ville"));
-
-     TableColumn<Adresse, String> colPays = new TableColumn<>("Pays");
-     colPays.setCellValueFactory(new PropertyValueFactory<>("pays"));
-
-     tableAdresse.getColumns().addAll(colId, colQuartier, colCommune, colVille, colPays);
-
-     loadAdresses();
-
-     VBox layout = new VBox(10, form, buttons, tableAdresse);
-     layout.setPadding(new Insets(15));
-
-     return layout;
- }
-
- // CRUD Adresse
- private void saveAdresse() {
-     try {
-    	 Adresse a = new Adresse();
-
-    	 int newId = a.getLastId() + 1;
-    	 
-         Adresse adr = new Adresse(
-                 newId,
-                 txtAdrQuartier.getText(),
-                 txtAdrCommune.getText(),
-                 txtAdrVille.getText(),
-                 txtAdrPays.getText()
-         );
-
-         adr.Enregistrer(adr);
-         loadAdresses();
-
-     } catch (Exception ex) {
-    	 ex.printStackTrace();
-         showError("Erreur lors de l'enregistreme : " + ex.getMessage());
-     }
- }
-
- private void deleteAdresse() {
-	    try {
-	        Adresse selected = tableAdresse.getSelectionModel().getSelectedItem();
-
-	        if (selected == null) {
-	            showError("Veuillez sélectionner une adresse dans la liste.");
-	            return;
-	        }
-
-	        Adresse a = new Adresse();
-	        a.Supprimer(selected.getId());
-	        loadAdresses();
-
-	    } catch (Exception ex) {
-	        showError("Erreur lors de la suppression : " + ex.getMessage());
-	    }
-	}
-
-
- private void loadAdresses() {
-     try {
-         Adresse a = new Adresse();
-         List<Adresse> list = a.Adresses();
-
-         tableAdresse.getItems().clear();
-         tableAdresse.getItems().addAll(list);
-
-     } catch (Exception ex) {
-         showError("Erreur lors du chargement : " + ex.getMessage());
-     }
- }
-
-//---------------------------------------------------------
-//PERSONNE-ADRESSE UI (DOMICILE)
-//---------------------------------------------------------
-private TableView<PersonneAdresse> tablePersonneAdresse;
-private TextField txtPAId;
-private TextField txtPAIdPersonne;
-private TextField txtPAIdAdresse;
-private TextField txtPAAvenue;
-private TextField txtPANumero;
-private ComboBox<Adresse> cbTelPersonneAdresse;
-
-private VBox buildPersonneAdresseUI() {
-
-  txtPAId = new TextField();
-  txtPAIdPersonne = new TextField();
-  txtPAIdAdresse = new TextField();
-  txtPAAvenue = new TextField();
-  txtPANumero = new TextField();
-  
-  cbTelPersonne = new ComboBox<>();
-  cbTelPersonne.setPromptText("Sélectionner une personne");
-
-  // Charger les personnes
-  Personne p = new Personne();
-  List<IPersonne> personnes = p.Personnes();
-
-  for (IPersonne pers : personnes) {
-      cbTelPersonne.getItems().add((Personne) pers);
-  }
-
-  // Affichage lisible
-  cbTelPersonne.setCellFactory(list -> new ListCell<>() {
-      @Override
-      protected void updateItem(Personne item, boolean empty) {
-          super.updateItem(item, empty);
-          setText(empty || item == null ? "" : item.getNom() + " " + item.getPostNom());
-      }
-  });
-
-  cbTelPersonne.setButtonCell(new ListCell<>() {
-      @Override
-      protected void updateItem(Personne item, boolean empty) {
-          super.updateItem(item, empty);
-          setText(empty || item == null ? "" : item.getNom() + " " + item.getPostNom());
-      }
-  });
-
-  txtPAId.setPromptText("ID");
-  txtPAIdPersonne.setPromptText("ID Personne");
-  txtPAIdAdresse.setPromptText("ID Adresse");
-  txtPAAvenue.setPromptText("Avenue");
-  txtPANumero.setPromptText("Numéro");
-  cbTelPersonneAdresse = new ComboBox<>();
-  cbTelPersonneAdresse.setPromptText("Sélectionner l'adresse d'une personne");
-
-  // Charger les adresses
-  Adresse pa = new Adresse();
-  List<Adresse> personnesAdresse = pa.Adresses();
-
-  for (Adresse pers : personnesAdresse) {
-      cbTelPersonneAdresse.getItems().add((Adresse) pers);
-  }
-
-  // Affichage lisible
-  cbTelPersonneAdresse.setCellFactory(list -> new ListCell<>() {
-      @Override
-      protected void updateItem(Adresse item, boolean empty) {
-          super.updateItem(item, empty);
-          setText(empty || item == null ? "" : item.getQuartier());
-      }
-  });
-
-  cbTelPersonneAdresse.setButtonCell(new ListCell<>() {
-      @Override
-      protected void updateItem(Adresse item, boolean empty) {
-          super.updateItem(item, empty);
-          setText(empty || item == null ? "" : item.getQuartier());
-      }
-  });
-
-  HBox form = new HBox(10, cbTelPersonne, cbTelPersonneAdresse, txtPAAvenue, txtPANumero);
-  form.setPadding(new Insets(10));
-  form.setAlignment(Pos.CENTER);
-
-  Button btnSave = new Button("Enregistrer");
-  Button btnDelete = new Button("Supprimer");
-
-  btnSave.setOnAction(e -> savePersonneAdresse());
-  btnDelete.setOnAction(e -> deletePersonneAdresse());
-
-  HBox buttons = new HBox(10, btnSave, btnDelete);
-  buttons.setAlignment(Pos.CENTER);
-  buttons.setPadding(new Insets(10));
-
-  tablePersonneAdresse = new TableView<>();
-
-  TableColumn<PersonneAdresse, Integer> colId = new TableColumn<>("ID");
-  colId.setCellValueFactory(new PropertyValueFactory<>("id"));
-
-  TableColumn<PersonneAdresse, Integer> colPers = new TableColumn<>("ID Personne");
-  colPers.setCellValueFactory(new PropertyValueFactory<>("idPersonne"));
-
-  TableColumn<PersonneAdresse, Integer> colAdr = new TableColumn<>("ID Adresse");
-  colAdr.setCellValueFactory(new PropertyValueFactory<>("idAdresse"));
-
-  TableColumn<PersonneAdresse, String> colAvenue = new TableColumn<>("Avenue");
-  colAvenue.setCellValueFactory(new PropertyValueFactory<>("avenue"));
-
-  TableColumn<PersonneAdresse, Integer> colNum = new TableColumn<>("Numéro");
-  colNum.setCellValueFactory(new PropertyValueFactory<>("numeroAvenue"));
-
-  tablePersonneAdresse.getColumns().addAll(colId, colPers, colAdr, colAvenue, colNum);
-
-  VBox layout = new VBox(10, form, buttons, tablePersonneAdresse);
-  layout.setPadding(new Insets(15));
-
-  loadPersonneAdresse();
-  
-  return layout;
-}
-
-//CRUD PersonneAdresse
-
-
-private void savePersonneAdresse() {
-  try {
-	// Récupérer la personne sélectionnée dans le ComboBox
-      Personne selectedPerson = cbTelPersonne.getValue();
-
-      if (selectedPerson == null) {
-          showError("Veuillez sélectionner une personne.");
-          return;
-      }
-
-   // Récupérer l'adresse sélectionnée dans le ComboBox
-      Adresse selectedPersonAdresse = cbTelPersonneAdresse.getValue();
-
-      if (selectedPersonAdresse == null) {
-          showError("Veuillez sélectionner une adresse d'une personne.");
-          return;
-      }
-      
-      // Générer le nouvel ID
-      PersonneAdresse p = new PersonneAdresse();
-      int newId = p.getLastId() + 1;
-      PersonneAdresse pa = new PersonneAdresse(
-              newId,
-              selectedPerson.getId(),
-              selectedPersonAdresse.getId(),
-              txtPAAvenue.getText(),
-              Integer.parseInt(txtPANumero.getText())
-      );
-
-      pa.Enregistrer(pa);
-
-  } catch (Exception ex) {
-	  ex.printStackTrace();
-      showError("Erreur lors de l'enregistrement du domicile : " + ex.getMessage());
-  }
-}
-
-private void deletePersonneAdresse() {
-	try{
-		PersonneAdresse selected = tablePersonneAdresse.getSelectionModel().getSelectedItem();
-
-    if (selected == null) {
-        showError("Veuillez sélectionner une adresse dans la liste.");
-        return;
+    /**
+     * Charge les données du rapport à partir de la procédure stockée.
+     * 
+     * @return Liste des rapports
+     */
+    private List<RapportPersonne> loadRapport() {
+        List<RapportPersonne> list = new ArrayList<>();
+        String sql = "{CALL sp_rapport_personnes()}";
+
+        try (CallableStatement stmt = DatabaseConnection.getInstance().prepareCall(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                list.add(new RapportPersonne(
+                        rs.getString("nomComplet"),
+                        rs.getString("numeros"),
+                        rs.getString("adresses")
+                ));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            showError("Erreur lors du chargement du rapport : " + e.getMessage());
+        }
+
+        return list;
     }
 
-    PersonneAdresse a = new PersonneAdresse();
-    a.Supprimer(selected.getId());
-    loadAdresses();
-
-} catch (Exception ex) {
-    showError("Erreur lors de la suppression : " + ex.getMessage());
-}
-}
-
-private void loadPersonneAdresse() {
-    try {
-        PersonneAdresse pa = new PersonneAdresse();
-        List<PersonneAdresse> list = pa.PersonnesAdresse();
-
-        tablePersonneAdresse.getItems().clear();
-        tablePersonneAdresse.getItems().addAll(list);
-
-    } catch (Exception ex) {
-        showError("Erreur lors du chargement : " + ex.getMessage());
-    }
-}
-
-    // ---------------------------------------------------------
-    // ERROR POPUP
-    // ---------------------------------------------------------
+    // ============================================================
+    // METHODES UTILITAIRES
+    // ============================================================
+    
+    /**
+     * Affiche une boîte de dialogue d'erreur.
+     * 
+     * @param msg Message d'erreur à afficher
+     */
     private void showError(String msg) {
         Alert alert = new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK);
-        alert.show();
+        alert.showAndWait();
     }
 
+    /**
+     * Affiche une boîte de dialogue de confirmation.
+     * 
+     * @param itemType Type d'élément à supprimer
+     * @return true si l'utilisateur confirme, false sinon
+     */
+    private boolean confirmDelete(String itemType) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+                "Voulez-vous vraiment supprimer ce " + itemType + " ?",
+                ButtonType.YES, ButtonType.NO);
+        return alert.showAndWait().orElse(ButtonType.NO) == ButtonType.YES;
+    }
+
+    // ============================================================
+    // POINT D'ENTREE PRINCIPAL
+    // ============================================================
+    
     public static void main(String[] args) {
-        launch();
+        launch(args);
     }
 }
